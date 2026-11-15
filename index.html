@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GATE OS · Paging & Virtual Memory Practice</title>
+
+<!-- Apply saved theme before paint (default = dark golden-black) -->
+<script>
+  try { if (localStorage.getItem('gate-vm-theme') === 'light') document.documentElement.classList.remove('dark'); } catch (e) {}
+</script>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' };</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------- Theme tokens ---------- */
+  :root {                       /* Light: white + purple */
+    --bg: #faf8ff; --card: #ffffff; --card2: #f4efff; --border: #e3d9f7;
+    --text: #1d1433; --muted: #6a5d88; --accent: #7c3aed; --accent2: #a78bfa;
+    --accent-soft: #efe6ff; --on-accent: #ffffff; --glow: rgba(124,58,237,.18);
+  }
+  .dark {                       /* Dark: golden black */
+    --bg: #090805; --card: #14110a; --card2: #1c170c; --border: #3b3118;
+    --text: #f6eed6; --muted: #a89a74; --accent: #f5b301; --accent2: #ffd75e;
+    --accent-soft: #2a2209; --on-accent: #120d00; --glow: rgba(245,179,1,.16);
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); transition: background .25s, color .25s; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:-1;
+    background: radial-gradient(900px 400px at 85% -10%, var(--glow), transparent 60%),
+                radial-gradient(700px 400px at -10% 10%, var(--glow), transparent 60%); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; }
+  .card-soft { background: var(--card2); border: 1px solid var(--border); border-radius: .75rem; }
+  .t-muted { color: var(--muted); } .t-accent { color: var(--accent); }
+  .grad-text { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .btn { display:inline-flex; align-items:center; gap:.4rem; padding:.55rem 1rem; border-radius:.65rem; font-weight:600; font-size:.875rem;
+         transition: transform .12s, filter .12s, background .2s; cursor:pointer; border:1px solid transparent; }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--on-accent); }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:disabled { opacity:.45; cursor:not-allowed; filter:none; }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+  .chip { padding:.3rem .8rem; border-radius:999px; font-size:.78rem; font-weight:600; border:1px solid var(--border);
+          color: var(--muted); background: transparent; cursor:pointer; transition: all .15s; white-space:nowrap; }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+  .field { background: var(--card2); border:1px solid var(--border); color: var(--text); border-radius:.65rem;
+           padding:.55rem .8rem; font-size:.875rem; outline:none; width:100%; transition:border .15s, box-shadow .15s; }
+  .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+  .field:disabled { opacity:.8; }
+
+  .badge { font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:.18rem .55rem; border-radius:.4rem; }
+  .badge-acc { background: var(--accent-soft); color: var(--accent); border:1px solid var(--border); }
+  .badge-easy { background: rgba(16,185,129,.14); color:#10b981; }
+  .badge-medium { background: rgba(245,158,11,.14); color:#d97706; }
+  .badge-hard { background: rgba(244,63,94,.14); color:#f43f5e; }
+  .dark .badge-medium { color:#fbbf24; }
+
+  .opt { display:flex; gap:.75rem; align-items:center; padding:.7rem .9rem; border:1px solid var(--border); border-radius:.7rem;
+         cursor:pointer; background: var(--card2); transition: all .15s; text-align:left; width:100%; color: var(--text); }
+  .opt:hover:not(.locked) { border-color: var(--accent); }
+  .opt .k { width:1.7rem; height:1.7rem; border-radius:.45rem; display:grid; place-items:center; font-weight:700; font-size:.8rem;
+            background: var(--accent-soft); color: var(--accent); flex:none; }
+  .opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .opt.sel .k { background: var(--accent); color: var(--on-accent); }
+  .opt.ok { border-color:#10b981; background: rgba(16,185,129,.12); } .opt.ok .k { background:#10b981; color:#fff; }
+  .opt.bad { border-color:#f43f5e; background: rgba(244,63,94,.12); } .opt.bad .k { background:#f43f5e; color:#fff; }
+  .opt.locked { cursor: default; }
+
+  .mrow { display:flex; gap:.75rem; align-items:center; padding:.55rem .8rem; border:1px solid var(--border); border-radius:.7rem; background: var(--card2); }
+  .mrow.ok { border-color:#10b981; background: rgba(16,185,129,.12); }
+  .mrow.bad { border-color:#f43f5e; background: rgba(244,63,94,.12); }
+
+  .ring { --p: 0; width:92px; height:92px; border-radius:50%; background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--border) 0); display:grid; place-items:center; }
+  .ring > div { width:72px; height:72px; border-radius:50%; background: var(--card); display:grid; place-items:center; font-weight:800; }
+  .bar { height:6px; border-radius:99px; background: var(--border); overflow:hidden; display:flex; }
+  .bar > i { display:block; height:100%; transition: width .4s; }
+
+  .warn { border:1px solid #f59e0b; background: rgba(245,158,11,.10); color: var(--text); border-radius:.7rem; padding:.7rem .9rem; font-size:.85rem; }
+  .fade-in { animation: fi .3s ease both; }
+  @keyframes fi { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+  ::-webkit-scrollbar { height:8px; width:8px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius:8px; }
+</style>
+</head>
+
+<body class="min-h-screen">
+
+<!-- =============== HEADER =============== -->
+<header class="sticky top-0 z-30 backdrop-blur border-b" style="background: color-mix(in srgb, var(--bg) 82%, transparent); border-color: var(--border)">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-xl grid place-items-center text-lg font-black" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--on-accent)">VM</div>
+    <div class="min-w-0">
+      <h1 class="font-extrabold leading-tight truncate">GATE OS <span class="grad-text">Paging &amp; Virtual Memory</span></h1>
+      <p class="text-xs t-muted truncate">Page tables · Multi-level paging · TLB · EMAT</p>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <button id="resetBtn" class="btn btn-ghost" title="Clear all progress">↺ <span class="hidden sm:inline">Reset</span></button>
+      <button id="themeBtn" class="btn btn-ghost" aria-label="Toggle theme"><span id="themeIcon">☾</span> <span id="themeLabel" class="hidden sm:inline">Theme</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+  <section id="dashboard" class="space-y-4"></section>
+
+  <!-- =============== FILTERS =============== -->
+  <section class="card p-4 space-y-3">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <input id="fSearch" class="field lg:col-span-1" placeholder="🔍  Search question or concept…" />
+      <select id="fYear" class="field"></select>
+      <select id="fType" class="field">
+        <option value="all">All types</option><option value="MCQ">MCQ</option><option value="NAT">NAT</option><option value="MATCH">Match the following</option>
+      </select>
+      <select id="fSort" class="field">
+        <option value="num">Question order</option><option value="asc">Year ↑</option><option value="desc">Year ↓</option>
+      </select>
+    </div>
+    <div class="flex flex-wrap gap-x-6 gap-y-2 items-center">
+      <div class="flex flex-wrap gap-2 items-center"><span class="text-xs t-muted font-semibold">Topic</span><span id="chipsTag" class="flex flex-wrap gap-2"></span></div>
+      <div class="flex flex-wrap gap-2 items-center"><span class="text-xs t-muted font-semibold">Difficulty</span><span id="chipsDiff" class="flex flex-wrap gap-2"></span></div>
+      <div class="flex flex-wrap gap-2 items-center"><span class="text-xs t-muted font-semibold">Status</span><span id="chipsStatus" class="flex flex-wrap gap-2"></span></div>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <span id="resultCount" class="t-muted"></span>
+      <button id="clearFilters" class="btn btn-ghost !py-1.5">Clear filters</button>
+    </div>
+  </section>
+
+  <section id="qList" class="space-y-4"></section>
+
+  <footer class="text-xs t-muted text-center pb-10 space-y-1">
+    <p>Progress is saved in your browser (localStorage). 14 questions.</p>
+    <p>Difficulty labels and topic tags are my own estimates; they weren't in the source text.</p>
+  </footer>
+</main>
+
+<script>
+/* =====================================================================
+ *  1. DATA  (14 questions, converted from the pasted text)
+ *  type: MCQ | NAT | MATCH.  year = null when the source didn't tag one.
+ *  flag = a note shown when the source answer/question had a problem.
+ * ===================================================================== */
+const META = { name: 'Paging & Address Translation', description: 'Page table entries, multi-level page tables, page table sizing, TLB design, and effective memory access time with page faults.' };
+
+const QUESTIONS = [
+  { id: 'Q1', n: 1, year: null, type: 'NAT', difficulty: 'Medium', tags: ['multi'], subtopic: 'Multi-level paging · PTE bits',
+    question: 'A processor uses a 36-bit physical address and a 32-bit virtual address. Page frame size is 4 KB. Page Table Entry (PTE) size is 4 bytes. A 3-level page table is used for virtual-to-physical address translation: Offset = bits 0–11 (12 bits), P3 (Level 3) = bits 12–20 (9 bits), P2 (Level 2) = bits 21–29 (9 bits), P1 (Level 1) = bits 30–31 (2 bits). How many bits are required for addressing the next level page table in the PTE of the first, second, and third level page tables respectively?',
+    answer: '25, 25, 24', hint: 'comma-separated, e.g. 20, 20, 20',
+    explanation: [
+      'Page size = 4 KB → offset = 12 bits. Physical address = 36 bits.',
+      'Level 3 PTE points to a data frame: 36 − 12 = 24 bits (frame number).',
+      'Level 3 and Level 2 tables each have 2^9 entries × 4 B = 2 KB. A 2 KB table is aligned on a 2 KB boundary, so its address needs 36 − 11 = 25 bits.',
+      'Level 1 PTEs point to Level 2 tables (2 KB each) → 25 bits. Level 2 PTEs point to Level 3 tables (2 KB each) → 25 bits.',
+      'Answer: 25, 25, 24.'
+    ],
+    formulas: ['Bits to address a table/frame = physical address bits − log₂(size of the thing pointed to)'],
+    mistake: 'Using 24 bits everywhere. Next-level tables here are only 2 KB, not a full 4 KB frame.' },
+
+  { id: 'Q2', n: 2, year: null, type: 'MATCH', difficulty: 'Easy', tags: ['pte'], subtopic: 'PTE control bits',
+    question: 'Match the following Page Table Entry (PTE) control bits with their functions.',
+    items: { 1: 'Dirty Bit', 2: 'Read/Write Bit', 3: 'Reference Bit', 4: 'Valid/Invalid Bit' },
+    choices: {
+      A: 'Indicates whether the page is present in physical memory.',
+      B: 'Indicates whether the page has been modified (determines write-back requirement).',
+      C: 'Used for access protection and permissions.',
+      D: 'Used by page replacement policies (e.g., LRU / Second Chance).' },
+    answer: { 1: 'B', 2: 'C', 3: 'D', 4: 'A' }, answerText: '1-B, 2-C, 3-D, 4-A',
+    explanation: [
+      'Dirty bit → B: set when the page is modified; a dirty victim must be written back to disk.',
+      'Read/Write bit → C: access rights (read-only vs read-write).',
+      'Reference bit → D: set on every access; replacement algorithms use it to judge recent use.',
+      'Valid/Invalid bit → A: valid = page is in RAM, invalid = on disk (or not mapped).'
+    ],
+    formulas: [], mistake: 'Mixing up the dirty bit (modified?) with the reference bit (accessed?).' },
+
+  { id: 'Q3', n: 3, year: 2009, type: 'MCQ', difficulty: 'Easy', tags: ['pte'], subtopic: 'PTE contents',
+    question: 'Which of the following is an essential content that must be stored inside a Page Table Entry (PTE)?',
+    options: { A: 'Virtual Page Number', B: 'Page Frame Number', C: 'Process ID', D: 'Offset' }, answer: 'B',
+    explanation: [
+      'The essential field is the Page Frame Number (PFN): it maps the logical page to its physical frame.',
+      'The Virtual Page Number is the index used to find the PTE, so it is not stored in the entry.',
+      'The offset is part of the virtual address and is copied unchanged into the physical address.'
+    ],
+    formulas: [], mistake: 'Thinking the VPN is stored in the PTE. It is the array index.' },
+
+  { id: 'Q4', n: 4, year: 2009, type: 'MCQ', difficulty: 'Easy', tags: ['multi'], subtopic: 'Why multi-level paging',
+    question: 'A multi-level page table is preferred in comparison to a single-level page table for translating virtual address to physical address primarily because:',
+    options: { A: 'It reduces the memory access time.', B: 'It helps to reduce the size of the page table memory needed to implement the virtual address space of a process.', C: 'It eliminates page faults completely.', D: 'It avoids TLB lookups.' }, answer: 'B',
+    explanation: [
+      'A single-level table is one huge contiguous array of PTEs for the whole address space, whether or not it is used.',
+      'Multi-level tables are allocated on demand and need not be contiguous. Unused regions need no lower-level tables, so far less memory is spent on page tables.',
+      'Multi-level paging actually adds memory accesses on a TLB miss; it does not remove faults or TLB lookups.'
+    ],
+    formulas: [], mistake: 'Choosing A. Multi-level paging saves space, not time.' },
+
+  { id: 'Q5', n: 5, year: null, type: 'NAT', difficulty: 'Medium', tags: ['emat'], subtopic: 'EMAT with page faults', unit: 'ns', tol: 0.5,
+    question: 'A system has a page fault service time of 10 milliseconds. The average memory access time when no page fault occurs is 20 nanoseconds. If 1 page fault is generated for every 10^6 memory references, what is the effective memory access time (in ns)?',
+    answer: '30', 
+    explanation: [
+      'm = 20 ns, p = 10⁻⁶, S = 10 ms = 10⁷ ns.',
+      'EAT = (1 − p)·m + p·S = 20 ns + (10⁻⁶ × 10⁷) ns = 20 + 10 = 30 ns.',
+      '(Exactly 29.99998 ns, which rounds to 30.)'
+    ],
+    formulas: ['EAT = (1 − p)·m + p·S'], mistake: 'Forgetting to convert ms to ns (10 ms = 10⁷ ns).' },
+
+  { id: 'Q6', n: 6, year: 2013, type: 'MCQ', difficulty: 'Medium', tags: ['multi'], subtopic: 'Multi-level paging · page size',
+    question: 'A computer uses a 46-bit virtual address, 32-bit physical address, and a 3-level page table. Each page table entry (PTE) is 32 bits (4 bytes). The top-level outer page table occupies a full page. Assuming every level page table fills a full page, what is the size of a page?',
+    options: { A: '2 KB', B: '4 KB', C: '8 KB', D: '16 KB' }, answer: 'C',
+    explanation: [
+      'Let page size = 2^k bytes. A page holds 2^k / 4 = 2^(k−2) PTEs, so each level resolves (k − 2) bits.',
+      'Virtual address = 3 × (k − 2) + k (offset) = 4k − 6 bits.',
+      '4k − 6 = 46 → k = 13 → page size = 2^13 B = 8 KB.'
+    ],
+    formulas: ['VA bits = L × (log₂(page size / PTE size)) + log₂(page size)'], mistake: 'Forgetting the offset bits when adding up the levels.' },
+
+  { id: 'Q7', n: 7, year: null, type: 'NAT', difficulty: 'Medium', tags: ['tlb', 'emat'], subtopic: 'TLB & EMAT', unit: 'ns', tol: 0,
+    question: 'Consider a system with a TLB. Physical memory access time is 100 ns and TLB lookup time is 20 ns. If the TLB hit ratio is 90%, what is the effective memory access time (in ns)?',
+    answer: '130',
+    flag: 'Your source text gave the answer as 120 ns, but its own working gives 130 ns for a 20 ns TLB. 120 ns is only correct if the TLB lookup were 10 ns. I use 130 here.',
+    explanation: [
+      'TLB hit time = 20 + 100 = 120 ns.',
+      'TLB miss time = 20 + 100 (page table) + 100 (data) = 220 ns.',
+      'EAT = 0.9 × 120 + 0.1 × 220 = 108 + 22 = 130 ns.',
+      'Equivalent: EAT = t + m + (1 − h)·m = 20 + 100 + 10 = 130 ns.',
+      'If the lookup time were 10 ns, the same formula gives 120 ns. That is probably where the original key came from.'
+    ],
+    formulas: ['EAT = h·(t + m) + (1 − h)·(t + 2m)   (single-level page table)'], mistake: 'Dropping the TLB lookup time on the miss path.' },
+
+  { id: 'Q8', n: 8, year: 2015, type: 'NAT', difficulty: 'Easy', tags: ['size'], subtopic: 'Single-level page table size', unit: 'MB', tol: 0,
+    question: 'Consider a system with byte-addressable memory, 32-bit logical address space, and 4 KB page size. Page table entry size is 4 bytes. What is the size of the single-level page table in megabytes (MB)?',
+    answer: '4',
+    explanation: [
+      'Offset = 12 bits, so VPN = 32 − 12 = 20 bits → 2^20 pages.',
+      'Page table size = 2^20 × 4 B = 4 MB.'
+    ],
+    formulas: ['Page table size = (2^VA / page size) × PTE size'], mistake: 'Using the number of frames instead of the number of virtual pages.' },
+
+  { id: 'Q9', n: 9, year: 2015, type: 'NAT', difficulty: 'Medium', tags: ['tlb'], subtopic: 'TLB tag bits', unit: 'bits', tol: 0,
+    question: 'A computer system implements a 48-bit virtual address space, 8 KB page size, and a TLB with 128 entries organized in a 4-way set associative structure. What is the minimum length of the TLB tag in bits?',
+    answer: '30',
+    explanation: [
+      'Offset = 13 bits → VPN = 48 − 13 = 35 bits.',
+      'Sets = 128 / 4 = 32 = 2^5 → set index = 5 bits.',
+      'Tag = VPN − index = 35 − 5 = 30 bits.'
+    ],
+    formulas: ['TLB tag = VPN bits − log₂(number of sets)'], mistake: 'Subtracting the offset bits twice, or using the entry count instead of the set count.' },
+
+  { id: 'Q10', n: 10, year: 2015, type: 'NAT', difficulty: 'Medium', tags: ['size'], subtopic: 'Virtual address length from table size', unit: 'bits', tol: 0,
+    question: 'A computer system implements an 8 KB page size and a 32-bit physical address space. Each page table entry contains a frame number plus 1 valid bit, 1 dirty bit, and 3 permission bits. If the maximum size of a page table is 24 MB, what is the length of the virtual address supported by the system (in bits)?',
+    answer: '36',
+    explanation: [
+      'Offset = 13 bits; frame number = 32 − 13 = 19 bits.',
+      'PTE = 19 + 1 + 1 + 3 = 24 bits = 3 bytes.',
+      'Entries = 24 MB / 3 B = 8 × 2^20 = 2^23 → page number = 23 bits.',
+      'Virtual address = 23 + 13 = 36 bits.'
+    ],
+    formulas: ['Entries = page table size / PTE size'], mistake: 'Treating the PTE as 4 bytes instead of 24 bits = 3 bytes.' },
+
+  { id: 'Q11', n: 11, year: 2016, type: 'NAT', difficulty: 'Medium', tags: ['size'], subtopic: 'Single-level page table size', unit: 'MB', tol: 0,
+    question: 'Consider a computer system with 40-bit virtual address space and a page size of 16 KB. The system uses a single-level page table per process, and each page table entry requires 48 bits (6 bytes). What is the size of the page table for a process in megabytes (MB)?',
+    answer: '384',
+    explanation: [
+      'Offset = 14 bits → VPN = 40 − 14 = 26 bits → 2^26 pages.',
+      'Size = 2^26 × 6 B = 6 × 64 MB = 384 MB.'
+    ],
+    formulas: ['2^26 B = 64 MB'], mistake: 'Using 4-byte entries instead of 6.' },
+
+  { id: 'Q12', n: 12, year: 2017, type: 'MCQ', difficulty: 'Easy', tags: ['emat'], subtopic: 'Page fault rate from EAT',
+    question: 'Consider a page-based virtual memory system. Let m be the memory access time when no page fault occurs, D be the service time for a page fault, and x be the average memory access time. Which of the following is the correct expression for the page fault rate p?',
+    options: { A: 'p = (D − m) / (x − m)', B: 'p = (x − m) / (D − m)', C: 'p = (D − m) / (m − x)', D: 'p = (m − x) / (D − m)' }, answer: 'B',
+    flag: 'The source text had no options for this question. I wrote the four options above myself, so the wording may differ from the original paper.',
+    explanation: [
+      'x = (1 − p)·m + p·D = m + p·(D − m).',
+      'So x − m = p·(D − m) → p = (x − m) / (D − m).'
+    ],
+    formulas: ['x = (1 − p)·m + p·D'], mistake: 'Inverting the fraction. Since x > m, the numerator must be x − m.' },
+
+  { id: 'Q13', n: 13, year: 2017, type: 'NAT', difficulty: 'Hard', tags: ['tlb', 'emat'], subtopic: 'TLB + page fault with dirty pages', unit: 'ns', tol: 0.6,
+    question: 'Consider a single-level paging system in main memory with a TLB. Memory access time is 100 ns and TLB lookup time is 20 ns. TLB hit ratio is 95%. When a page fault occurs, page transfer takes 5000 ns. 20% of page faults involve dirty pages. Calculate the effective memory access time (in ns).',
+    answer: '154.5',
+    flag: 'Cannot verify: the question never gives the page fault rate, so 154.5 ns cannot be derived from the data as written. The source explanation also skips the actual calculation. I kept the key (154.5, anything from 154 to 155 is accepted) so you can practise the setup, but do not trust it as an exam-verified answer. Check the original paper.',
+    explanation: [
+      'TLB hit (95%): 20 + 100 = 120 ns.',
+      'TLB miss (5%): 20 + 100 (page table) + 100 (data) = 220 ns, plus any page-fault cost.',
+      'Page-fault cost per fault: clean (80%) = 5000 ns; dirty (20%) = 5000 + 5000 = 10000 ns, so the average is 0.8 × 5000 + 0.2 × 10000 = 6000 ns.',
+      'The final EMAT needs a page-fault probability, which is missing, so the quoted 154.5 ns cannot be reproduced from the given numbers.'
+    ],
+    formulas: ['EMAT = h·(t + m) + (1 − h)·[t + 2m + p_f · avg_fault_cost]'], mistake: 'Ignoring that a dirty victim costs two transfers (write-back + read-in).' },
+
+  { id: 'Q14', n: 14, year: 2021, type: 'NAT', difficulty: 'Hard', tags: ['multi', 'size'], subtopic: 'Multi-level page table memory', unit: 'KB', tol: 0,
+    question: 'Consider a 3-level page table system for a 39-bit virtual address space. Page size is 4 KB (2^12 bytes). Page Table Entry (PTE) size at every level is 8 bytes. The virtual address is split into P1 = 9 bits, P2 = 9 bits, P3 = 9 bits, Offset = 12 bits. A process is currently using 2 GB of virtual memory space. What is the MINIMUM amount of memory required for page tables (in KB) to map this process?',
+    answer: '4108',
+    explanation: [
+      '2 GB = 2^31 B → pages = 2^31 / 2^12 = 2^19.',
+      'Each page table holds 4 KB / 8 B = 512 = 2^9 entries.',
+      'Level 3: 2^19 / 2^9 = 2^10 = 1024 tables.',
+      'Level 2: 1024 / 512 = 2 tables.',
+      'Level 1: 1 table.',
+      'Total = 1 + 2 + 1024 = 1027 tables × 4 KB = 4108 KB.'
+    ],
+    formulas: ['Tables at a level = ceil(entries needed below / entries per table)'], mistake: 'Counting only the level-3 tables, or assuming all 512 level-1 entries are used.' }
+];
+
+const TAGS = [
+  { key: 'all',   label: 'All' },
+  { key: 'pte',   label: 'PTE basics' },
+  { key: 'size',  label: 'Page table size' },
+  { key: 'multi', label: 'Multi-level paging' },
+  { key: 'tlb',   label: 'TLB' },
+  { key: 'emat',  label: 'EMAT / page faults' }
+];
+const DIFFS = ['all', 'Easy', 'Medium', 'Hard'];
+const STATUSES = [['all', 'All'], ['unattempted', 'Unattempted'], ['correct', 'Correct'], ['incorrect', 'Incorrect']];
+
+/* =====================================================================
+ *  2. STATE & PERSISTENCE
+ * ===================================================================== */
+const LS = { theme: 'gate-vm-theme', answers: 'gate-vm2-answers' };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+const state = {
+  answers: store.get(LS.answers, {}),   // { id: { value, correct } }
+  drafts: {},                            // unsubmitted inputs
+  open: new Set(),                       // expanded solutions
+  f: { search: '', year: 'all', type: 'all', tag: 'all', diff: 'all', status: 'all', sort: 'num' }
+};
+
+/* =====================================================================
+ *  3. HELPERS
+ * ===================================================================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nums = s => String(s).split(/[,;\s]+/).filter(Boolean).map(Number);
+const byId = id => QUESTIONS.find(q => q.id === id);
+const persist = () => store.set(LS.answers, state.answers);
+const statusOf = q => { const a = state.answers[q.id]; return !a ? 'unattempted' : a.correct ? 'correct' : 'incorrect'; };
+const typeLabel = t => t === 'MATCH' ? 'Match' : t;
+
+/** Evaluate an answer for each question type. */
+function evaluate(q, v) {
+  if (q.type === 'MCQ') return v === q.answer;
+  if (q.type === 'MATCH') return Object.keys(q.answer).every(k => v && v[k] === q.answer[k]);
+  const got = nums(v), exp = nums(q.answer), tol = q.tol ?? 0;
+  if (!got.length || got.some(isNaN) || got.length !== exp.length) return false;
+  return exp.every((e, i) => Math.abs(got[i] - e) <= tol + 1e-9);
+}
+const answerShown = q => q.type === 'MATCH' ? q.answerText : (q.type === 'MCQ' ? `${q.answer}. ${q.options[q.answer]}` : q.answer + (q.unit ? ' ' + q.unit : ''));
+const valueShown = (q, v) => q.type === 'MATCH' ? Object.entries(v).map(([k, x]) => `${k}-${x}`).join(', ') : v;
+
+/* =====================================================================
+ *  4. DASHBOARD
+ * ===================================================================== */
+function renderDashboard() {
+  const total = QUESTIONS.length;
+  const ans = QUESTIONS.map(q => state.answers[q.id]).filter(Boolean);
+  const attempted = ans.length, correct = ans.filter(a => a.correct).length, wrong = attempted - correct;
+  const acc = attempted ? Math.round(correct / attempted * 100) : 0, done = Math.round(attempted / total * 100);
+
+  const stat = (label, val, color) => `<div class="card-soft p-4"><div class="text-xs t-muted font-semibold uppercase tracking-wide">${label}</div>
+    <div class="text-3xl font-extrabold mt-1" style="color:${color}">${val}</div></div>`;
+
+  const tagRows = TAGS.filter(t => t.key !== 'all').map(t => {
+    const qs = QUESTIONS.filter(q => q.tags.includes(t.key));
+    const c = qs.filter(q => statusOf(q) === 'correct').length, w = qs.filter(q => statusOf(q) === 'incorrect').length;
+    return `<button data-tag="${t.key}" class="text-left w-full card-soft p-3 hover:!border-[var(--accent)] transition">
+      <div class="flex justify-between text-sm font-semibold"><span>${esc(t.label)}</span><span class="t-muted">${c}/${qs.length}</span></div>
+      <div class="bar mt-2"><i style="width:${c / qs.length * 100}%;background:#10b981"></i><i style="width:${w / qs.length * 100}%;background:#f43f5e"></i></div></button>`;
+  }).join('');
+
+  const diffRows = ['Easy', 'Medium', 'Hard'].map(d => {
+    const n = QUESTIONS.filter(q => q.difficulty === d).length;
+    return `<button data-diff="${d}" class="badge badge-${d.toLowerCase()} !text-sm !px-3 !py-1.5 cursor-pointer hover:opacity-80">${d} · ${n}</button>`;
+  }).join(' ');
+
+  $('#dashboard').innerHTML = `
+  <div class="card p-5 fade-in">
+    <div class="flex flex-col md:flex-row md:items-center gap-5">
+      <div class="flex-1">
+        <span class="badge badge-acc">Operating Systems</span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold mt-2">${esc(META.name)}</h2>
+        <p class="t-muted text-sm mt-1 max-w-2xl">${esc(META.description)}</p>
+        <div class="flex flex-wrap gap-2 mt-3 items-center"><span class="text-xs t-muted font-semibold">Filter by difficulty:</span>${diffRows}</div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="ring" style="--p:${acc}"><div><span class="text-xl">${acc}%</span></div></div>
+        <div class="text-sm"><div class="font-bold">Accuracy</div><div class="t-muted">${done}% of bank attempted</div></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+      ${stat('Total questions', total, 'var(--text)')}${stat('Attempted', attempted, 'var(--accent)')}
+      ${stat('Correct', correct, '#10b981')}${stat('Incorrect', wrong, '#f43f5e')}
+    </div>
+    <div class="mt-5"><div class="text-xs t-muted font-semibold uppercase tracking-wide mb-2">Topic breakdown (click to filter)</div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">${tagRows}</div></div>
+  </div>`;
+}
+
+/* =====================================================================
+ *  5. QUESTION CARDS
+ * ===================================================================== */
+function inputHTML(q, a, locked) {
+  const draft = state.drafts[q.id] ?? (a ? a.value : (q.type === 'MATCH' ? {} : ''));
+
+  if (q.type === 'MCQ') {
+    return `<div class="grid gap-2 mt-4">${Object.entries(q.options).map(([k, t]) => {
+      let cls = '';
+      if (locked) cls = k === q.answer ? 'ok' : (k === a.value ? 'bad' : '');
+      else if (draft === k) cls = 'sel';
+      return `<button type="button" class="opt ${cls} ${locked ? 'locked' : ''}" ${locked ? '' : `data-act="pick" data-id="${q.id}" data-val="${k}"`}>
+        <span class="k">${k}</span><span>${esc(t)}</span></button>`;
+    }).join('')}</div>`;
+  }
+
+  if (q.type === 'MATCH') {
+    const choices = Object.entries(q.choices).map(([k, t]) => `<li><b class="t-accent">${k}.</b> ${esc(t)}</li>`).join('');
+    const rows = Object.entries(q.items).map(([k, name]) => {
+      const sel = draft[k] || '';
+      const cls = locked ? (a.value[k] === q.answer[k] ? 'ok' : 'bad') : '';
+      return `<div class="mrow ${cls}"><span class="font-semibold flex-1">${k}. ${esc(name)}</span>
+        <select class="field !w-28" data-match="${q.id}" data-k="${k}" ${locked ? 'disabled' : ''}>
+          <option value="">Select…</option>${Object.keys(q.choices).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${c}</option>`).join('')}
+        </select></div>`;
+    }).join('');
+    return `<div class="card-soft p-3 mt-4"><div class="text-xs font-bold uppercase tracking-wide t-accent mb-2">Functions</div>
+      <ul class="space-y-1 text-sm">${choices}</ul></div><div class="grid gap-2 mt-3">${rows}</div>`;
+  }
+
+  /* NAT */
+  return `<div class="mt-4 flex items-center gap-2"><input class="field mono max-w-xs" data-nat="${q.id}" value="${esc(draft)}" ${locked ? 'disabled' : ''}
+    placeholder="${esc(q.hint || 'Enter your answer')}" inputmode="decimal" autocomplete="off" />${q.unit ? `<span class="t-muted text-sm font-semibold">${q.unit}</span>` : ''}</div>`;
+}
+
+function solutionHTML(q) {
+  const list = (title, items) => items && items.length ? `<div><div class="text-xs font-bold uppercase tracking-wide t-accent mb-1">${title}</div>
+    <ul class="space-y-1 text-sm list-disc pl-5">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>` : '';
+  return `<div class="card-soft p-4 mt-4 space-y-4 fade-in">
+    <div><div class="text-xs font-bold uppercase tracking-wide t-accent mb-1">Correct answer</div>
+      <div class="font-extrabold text-lg">${esc(answerShown(q))}</div></div>
+    <div><div class="text-xs font-bold uppercase tracking-wide t-accent mb-1">Step-by-step solution</div>
+      <ol class="list-decimal pl-5 space-y-1 text-sm leading-relaxed">${q.explanation.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>
+    <div class="grid md:grid-cols-2 gap-4">${list('Formula', q.formulas)}${list('Common mistake', q.mistake ? [q.mistake] : [])}</div>
+  </div>`;
+}
+
+function cardHTML(q) {
+  const a = state.answers[q.id], locked = !!a, isOpen = state.open.has(q.id);
+  const draft = state.drafts[q.id];
+  const ready = q.type === 'MATCH' ? Object.keys(q.items).every(k => draft && draft[k]) : (draft != null && String(draft).trim() !== '');
+
+  const result = locked ? `<div class="mt-3 p-3 rounded-lg text-sm font-semibold fade-in" style="background:${a.correct ? 'rgba(16,185,129,.13)' : 'rgba(244,63,94,.13)'};color:${a.correct ? '#10b981' : '#f43f5e'}">
+    ${a.correct ? '✔ Correct!' : `✘ Incorrect. You answered <span class="mono">${esc(valueShown(q, a.value))}</span>; correct answer is <span class="mono">${esc(q.type === 'MCQ' ? q.answer : answerShown(q))}</span>.`}</div>` : '';
+
+  return `<article id="q-${q.id}" class="card p-5 fade-in">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="mono text-xs font-semibold t-muted">${q.id}</span>
+      ${q.year ? `<span class="badge badge-acc">GATE ${q.year}</span>` : ''}
+      <span class="badge badge-acc">${typeLabel(q.type)}</span>
+      <span class="badge badge-${q.difficulty.toLowerCase()}">${q.difficulty}</span>
+      <span class="ml-auto text-xs t-muted text-right">${esc(q.subtopic)}</span>
+    </div>
+    <p class="mt-3 font-medium leading-relaxed">${esc(q.question)}</p>
+    ${inputHTML(q, a, locked)}
+    ${result}
+    <div class="flex flex-wrap gap-2 mt-4">
+      ${locked ? `<button class="btn btn-ghost" data-act="retry" data-id="${q.id}">↺ Try again</button>`
+               : `<button class="btn btn-primary" data-act="check" data-id="${q.id}" ${ready ? '' : 'disabled'}>Check answer</button>`}
+      <button class="btn btn-ghost" data-act="toggle" data-id="${q.id}">${isOpen ? 'Hide solution' : 'View solution'}</button>
+    </div>
+    ${isOpen && q.flag ? `<div class="warn mt-4">⚠ ${esc(q.flag)}</div>` : ''}
+    ${isOpen ? solutionHTML(q) : ''}
+  </article>`;
+}
+
+/* =====================================================================
+ *  6. FILTERING
+ * ===================================================================== */
+function filtered() {
+  const f = state.f, s = f.search.trim().toLowerCase();
+  let list = QUESTIONS.filter(q =>
+    (f.year === 'all' || (f.year === 'none' ? !q.year : q.year === +f.year)) &&
+    (f.type === 'all' || q.type === f.type) &&
+    (f.tag === 'all' || q.tags.includes(f.tag)) &&
+    (f.diff === 'all' || q.difficulty === f.diff) &&
+    (f.status === 'all' || statusOf(q) === f.status) &&
+    (!s || [q.id, q.question, q.subtopic, q.explanation.join(' ')].join(' ').toLowerCase().includes(s)));
+  if (f.sort === 'asc')  list.sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || a.n - b.n);
+  if (f.sort === 'desc') list.sort((a, b) => (b.year ?? -1) - (a.year ?? -1) || a.n - b.n);
+  return list;
+}
+
+function renderList() {
+  const list = filtered();
+  $('#resultCount').textContent = `Showing ${list.length} of ${QUESTIONS.length}`;
+  $('#qList').innerHTML = list.length ? list.map(cardHTML).join('')
+    : `<div class="card p-10 text-center t-muted">No questions match your filters. <button class="t-accent font-semibold underline" data-act="clear">Clear filters</button></div>`;
+}
+function renderChips() {
+  const mk = (arr, cur, attr) => arr.map(([v, l]) => `<button class="chip ${cur === v ? 'on' : ''}" data-${attr}="${v}">${esc(l)}</button>`).join('');
+  $('#chipsTag').innerHTML = mk(TAGS.map(t => [t.key, t.label]), state.f.tag, 'tag');
+  $('#chipsDiff').innerHTML = mk(DIFFS.map(d => [d, d === 'all' ? 'All' : d]), state.f.diff, 'diff');
+  $('#chipsStatus').innerHTML = mk(STATUSES, state.f.status, 'status');
+}
+function renderAll() { renderDashboard(); renderChips(); renderList(); }
+
+/** Re-render just one card (keeps scroll position, no full list flicker). */
+function refreshCard(id) {
+  const el = document.getElementById('q-' + id); if (!el) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = cardHTML(byId(id));
+  el.replaceWith(tmp.firstElementChild);
+}
+
+/* =====================================================================
+ *  7. EVENTS
+ * ===================================================================== */
+function checkAnswer(id) {
+  const q = byId(id); let v = state.drafts[id];
+  if (q.type === 'NAT') v = (v ?? '').toString().trim();
+  if (v == null || v === '') return;
+  state.answers[id] = { value: v, correct: evaluate(q, v) };
+  persist(); refreshCard(id); renderDashboard(); renderChips();
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-tag],[data-diff],[data-status]');
+  if (!t) return;
+  if (t.dataset.tag !== undefined)    { state.f.tag = t.dataset.tag; renderChips(); renderList(); $('#fSearch').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (t.dataset.diff !== undefined)   { state.f.diff = state.f.diff === t.dataset.diff ? 'all' : t.dataset.diff; renderChips(); renderList(); return; }
+  if (t.dataset.status !== undefined) { state.f.status = t.dataset.status; renderChips(); renderList(); return; }
+
+  const id = t.dataset.id;
+  switch (t.dataset.act) {
+    case 'pick':   state.drafts[id] = t.dataset.val; refreshCard(id); break;
+    case 'check':  checkAnswer(id); break;
+    case 'retry':  delete state.answers[id]; delete state.drafts[id]; persist(); refreshCard(id); renderDashboard(); renderChips(); break;
+    case 'toggle': state.open.has(id) ? state.open.delete(id) : state.open.add(id); refreshCard(id); break;
+    case 'clear':  clearFilters(); break;
+  }
+});
+
+/* NAT typing: store draft + toggle the Check button without re-rendering (keeps cursor/focus) */
+document.addEventListener('input', e => {
+  const id = e.target.dataset && e.target.dataset.nat; if (!id) return;
+  state.drafts[id] = e.target.value;
+  const btn = document.querySelector(`#q-${id} [data-act="check"]`); if (btn) btn.disabled = e.target.value.trim() === '';
+});
+/* MATCH dropdowns */
+document.addEventListener('change', e => {
+  const id = e.target.dataset && e.target.dataset.match; if (!id) return;
+  const q = byId(id), d = state.drafts[id] = state.drafts[id] || {};
+  d[e.target.dataset.k] = e.target.value;
+  const btn = document.querySelector(`#q-${id} [data-act="check"]`);
+  if (btn) btn.disabled = !Object.keys(q.items).every(k => d[k]);
+});
+document.addEventListener('keydown', e => {
+  const id = e.target.dataset && e.target.dataset.nat; if (id && e.key === 'Enter') checkAnswer(id);
+});
+
+/* Filter controls */
+$('#fSearch').addEventListener('input', e => { state.f.search = e.target.value; renderList(); });
+$('#fYear').addEventListener('change', e => { state.f.year = e.target.value; renderList(); });
+$('#fType').addEventListener('change', e => { state.f.type = e.target.value; renderList(); });
+$('#fSort').addEventListener('change', e => { state.f.sort = e.target.value; renderList(); });
+function clearFilters() {
+  state.f = { search: '', year: 'all', type: 'all', tag: 'all', diff: 'all', status: 'all', sort: 'num' };
+  $('#fSearch').value = ''; $('#fYear').value = 'all'; $('#fType').value = 'all'; $('#fSort').value = 'num';
+  renderChips(); renderList();
+}
+$('#clearFilters').addEventListener('click', clearFilters);
+
+/* Reset progress */
+$('#resetBtn').addEventListener('click', () => {
+  if (!confirm('Reset all progress (answers and scores)?')) return;
+  state.answers = {}; state.drafts = {}; state.open.clear(); persist(); renderAll();
+});
+
+/* Theme toggle (persisted raw string to match the <head> script) */
+function syncThemeUI() {
+  const dark = document.documentElement.classList.contains('dark');
+  $('#themeIcon').textContent = dark ? '☀' : '☾'; $('#themeLabel').textContent = dark ? 'Light' : 'Dark';
+}
+$('#themeBtn').addEventListener('click', () => {
+  const dark = document.documentElement.classList.toggle('dark');
+  try { localStorage.setItem(LS.theme, dark ? 'dark' : 'light'); } catch (err) {}
+  syncThemeUI();
+});
+
+/* =====================================================================
+ *  8. INIT
+ * ===================================================================== */
+(function init() {
+  const years = [...new Set(QUESTIONS.map(q => q.year).filter(Boolean))].sort((a, b) => a - b);
+  $('#fYear').innerHTML = '<option value="all">All years</option>' + years.map(y => `<option value="${y}">GATE ${y}</option>`).join('') + '<option value="none">Year not tagged</option>';
+  syncThemeUI(); renderAll();
+})();
+</script>
+</body>
+</html>
